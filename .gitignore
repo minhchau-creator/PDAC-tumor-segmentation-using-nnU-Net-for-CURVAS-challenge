@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# nnU-Net specific
+nnUNet_raw/
+nnUNet_preprocessed/
+nnUNet_results/
+test_results/
+predictions/
+
+# Data files
+*.nii
+*.nii.gz
+*.npz
+*.pkl
+*.pth
+*.pt
+
+# Logs
+*.log
+*.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
