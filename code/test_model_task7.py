@@ -1,7 +1,7 @@
 """
-Test nnU-Net model and organize results in structured format
+Test nnU-Net model on Task7_PDAC data and organize results
 
-This script:
+This script works with Task7_PDAC format (original 512x512 images):
 1. Runs inference on test images using trained checkpoint
 2. Uncrops predictions back to original image size
 3. Organizes output in the format:
@@ -11,8 +11,8 @@ This script:
    └── PDAC_{id}_predict.nii.gz (prediction at original size)
 
 Usage:
-    python test_model.py --input /path/to/folder --output /path/to/output
-    python test_model.py  (will use default paths)
+    python test_model_task7.py --input /path/to/images --labels /path/to/labels --output /path/to/output
+    python test_model_task7.py  (will use default paths)
 """
 
 import os
@@ -29,101 +29,50 @@ os.environ['nnUNet_raw'] = f"{BASE_PATH}/nnUNet_raw"
 os.environ['nnUNet_preprocessed'] = f"{BASE_PATH}/nnUNet_preprocessed"
 os.environ['nnUNet_results'] = f"{BASE_PATH}/nnUNet_results"
 
-# Default paths
-DEFAULT_INPUT = "/home/minhchau/anaconda3/envs/curvas/curvas/Split_Data/val"
-DEFAULT_OUTPUT = "/home/minhchau/anaconda3/envs/curvas/curvas/test_results/test"
+# Default paths for Task7_PDAC
+DEFAULT_INPUT = f"{BASE_PATH}/nnUNet_raw/Task7_PDAC/imagesTr"
+DEFAULT_LABELS = f"{BASE_PATH}/nnUNet_raw/Task7_PDAC/labelsTr"
+DEFAULT_OUTPUT = f"{BASE_PATH}/test_results/task7_results"
 
 # Model configuration
-DATASET_ID = "001"
+DATASET_ID = "001"  # or "7" if using Task7
 CHECKPOINT_TYPE = "checkpoint_best.pth"
 NNUNET_CMD = "/home/minhchau/anaconda3/envs/curvas/bin/nnUNetv2_predict"
 
 # Global variables
 TEST_INPUT = None
+TEST_LABELS = None
 OUTPUT_DIR = None
 TEMP_DIR = None
-TEMP_INPUT_DIR = None
-TEMP_LABELS_DIR = None
 PREDICTIONS_DIR = None
 
 def parse_args():
     """Parse command line arguments"""
-    parser = argparse.ArgumentParser(description='Test nnU-Net model and organize results')
+    parser = argparse.ArgumentParser(description='Test nnU-Net model on Task7_PDAC data')
     parser.add_argument('--input', type=str, default=DEFAULT_INPUT,
-                        help=f'Input folder (default: {DEFAULT_INPUT})')
+                        help=f'Input images folder (default: {DEFAULT_INPUT})')
+    parser.add_argument('--labels', type=str, default=DEFAULT_LABELS,
+                        help=f'Ground truth labels folder (default: {DEFAULT_LABELS})')
     parser.add_argument('--output', type=str, default=DEFAULT_OUTPUT,
                         help=f'Output directory (default: {DEFAULT_OUTPUT})')
     parser.add_argument('--checkpoint', type=str, default=CHECKPOINT_TYPE,
                         help=f'Checkpoint to use (default: {CHECKPOINT_TYPE})')
+    parser.add_argument('--dataset-id', type=str, default=DATASET_ID,
+                        help=f'Dataset ID (default: {DATASET_ID})')
     return parser.parse_args()
 
 def setup_paths(args):
     """Setup global path variables"""
-    global TEST_INPUT, OUTPUT_DIR, TEMP_DIR, TEMP_INPUT_DIR, TEMP_LABELS_DIR, PREDICTIONS_DIR, CHECKPOINT_TYPE
+    global TEST_INPUT, TEST_LABELS, OUTPUT_DIR, TEMP_DIR, PREDICTIONS_DIR, CHECKPOINT_TYPE, DATASET_ID
 
     TEST_INPUT = args.input
+    TEST_LABELS = args.labels
     OUTPUT_DIR = args.output
     CHECKPOINT_TYPE = args.checkpoint
+    DATASET_ID = args.dataset_id
 
-    TEMP_DIR = f"{BASE_PATH}/temp_inference_val"
-    TEMP_INPUT_DIR = f"{TEMP_DIR}/images"
-    TEMP_LABELS_DIR = f"{TEMP_DIR}/labels"
+    TEMP_DIR = f"{BASE_PATH}/temp_inference_task7"
     PREDICTIONS_DIR = f"{TEMP_DIR}/predictions"
-
-def prepare_nnunet_format():
-    """
-    Prepare data in nnUNet format from Split_Data/val structure
-
-    Input structure:
-        val/CURVASPDAC_XXXXX/image.nii.gz
-        val/CURVASPDAC_XXXXX/annotation_staple.nii.gz
-
-    Output structure (nnUNet format):
-        temp/images/PDAC_0001_0000.nii.gz
-        temp/labels/PDAC_0001.nii.gz
-    """
-    print("\n" + "="*80)
-    print("Preparing data in nnUNet format")
-    print("="*80)
-
-    # Create temp directories
-    os.makedirs(TEMP_INPUT_DIR, exist_ok=True)
-    os.makedirs(TEMP_LABELS_DIR, exist_ok=True)
-
-    # Get all case folders
-    case_folders = sorted([d for d in os.listdir(TEST_INPUT)
-                          if os.path.isdir(os.path.join(TEST_INPUT, d))])
-
-    print(f"\nFound {len(case_folders)} cases in {TEST_INPUT}")
-
-    case_mapping = {}  # Map PDAC_XXXX to original CURVASPDAC_XXXXX
-
-    for idx, case_name in enumerate(case_folders, start=1):
-        case_dir = os.path.join(TEST_INPUT, case_name)
-        image_path = os.path.join(case_dir, "image.nii.gz")
-        label_path = os.path.join(case_dir, "annotation_staple.nii.gz")
-
-        # Create nnUNet format name
-        pdac_id = f"PDAC_{idx:04d}"
-        case_mapping[pdac_id] = case_name
-
-        # Copy image with _0000 suffix (nnUNet format)
-        if os.path.exists(image_path):
-            dest_img = os.path.join(TEMP_INPUT_DIR, f"{pdac_id}_0000.nii.gz")
-            shutil.copy(image_path, dest_img)
-        else:
-            print(f"  ⚠️  Image not found: {image_path}")
-
-        # Copy label
-        if os.path.exists(label_path):
-            dest_label = os.path.join(TEMP_LABELS_DIR, f"{pdac_id}.nii.gz")
-            shutil.copy(label_path, dest_label)
-
-    print(f"✅ Prepared {len(case_folders)} cases in nnUNet format")
-    print(f"   Images: {TEMP_INPUT_DIR}")
-    print(f"   Labels: {TEMP_LABELS_DIR}")
-
-    return case_mapping
 
 def run_inference():
     """Run nnU-Net inference"""
@@ -135,12 +84,13 @@ def run_inference():
 
     cmd = [
         NNUNET_CMD,
-        "-i", TEMP_INPUT_DIR,
+        "-i", TEST_INPUT,
         "-o", PREDICTIONS_DIR,
         "-d", DATASET_ID,
         "-c", "3d_fullres",
         "-f", "0",
-        "-chk", CHECKPOINT_TYPE
+        "-chk", CHECKPOINT_TYPE,
+        "--disable_progress_bar"  # Reduce overhead
     ]
 
     print(f"Command: {' '.join(cmd)}\n")
@@ -208,10 +158,11 @@ def uncrop_prediction(pred_path, original_img_path):
 
     return uncropped_img
 
-def organize_results(case_mapping):
+def organize_results():
     """
     Organize results into structured format
 
+    Input format: PDAC_XXXX_0000.nii.gz (images), PDAC_XXXX.nii.gz (labels/predictions)
     Output: {OUTPUT_DIR}/PDAC_{id}/
             ├── PDAC_{id}_img.nii.gz
             ├── PDAC_{id}_groundtruth.nii.gz
@@ -223,57 +174,77 @@ def organize_results(case_mapping):
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    processed_count = 0
+    # Get all image files (format: PDAC_XXXX_0000.nii.gz)
+    from pathlib import Path
+    image_files = sorted(Path(TEST_INPUT).glob("*_0000.nii.gz"))
+    print(f"\nFound {len(image_files)} test images")
 
-    for pdac_id, original_case_name in case_mapping.items():
-        print(f"\n  Processing {pdac_id} ({original_case_name})...")
+    # Check what predictions were actually created
+    if os.path.exists(PREDICTIONS_DIR):
+        pred_files = sorted([f for f in os.listdir(PREDICTIONS_DIR) if f.endswith('.nii.gz')])
+        print(f"Found {len(pred_files)} prediction files")
+        if len(pred_files) < len(image_files):
+            print(f"⚠️  Warning: {len(image_files) - len(pred_files)} predictions are missing!")
+    else:
+        print(f"❌ Predictions directory not found: {PREDICTIONS_DIR}")
+        return 0, len(image_files)
+
+    processed_count = 0
+    failed_cases = []
+
+    for img_file in image_files:
+        # Extract case ID: PDAC_0001_0000.nii.gz -> PDAC_0001
+        case_id = img_file.stem.replace('_0000', '').replace('.nii', '')
+
+        print(f"\n  Processing {case_id}...")
 
         # Create output folder for this case
-        case_output_dir = os.path.join(OUTPUT_DIR, pdac_id)
+        case_output_dir = os.path.join(OUTPUT_DIR, case_id)
         os.makedirs(case_output_dir, exist_ok=True)
 
         # Define paths
-        original_case_dir = os.path.join(TEST_INPUT, original_case_name)
-        original_img_path = os.path.join(original_case_dir, "image.nii.gz")
-        original_label_path = os.path.join(original_case_dir, "annotation_staple.nii.gz")
-
-        output_img_path = os.path.join(case_output_dir, f"{pdac_id}_img.nii.gz")
-        output_gt_path = os.path.join(case_output_dir, f"{pdac_id}_groundtruth.nii.gz")
-        output_pred_path = os.path.join(case_output_dir, f"{pdac_id}_predict.nii.gz")
+        output_img_path = os.path.join(case_output_dir, f"{case_id}_img.nii.gz")
+        output_gt_path = os.path.join(case_output_dir, f"{case_id}_groundtruth.nii.gz")
+        output_pred_path = os.path.join(case_output_dir, f"{case_id}_predict.nii.gz")
 
         # Copy original image
-        if os.path.exists(original_img_path):
-            shutil.copy(original_img_path, output_img_path)
-            print(f"    ✅ Copied image: {pdac_id}_img.nii.gz")
-        else:
-            print(f"    ❌ Original image not found")
-            continue
+        shutil.copy(str(img_file), output_img_path)
+        print(f"    ✅ Copied image: {case_id}_img.nii.gz")
 
-        # Copy ground truth
-        if os.path.exists(original_label_path):
-            shutil.copy(original_label_path, output_gt_path)
-            print(f"    ✅ Copied ground truth: {pdac_id}_groundtruth.nii.gz")
+        # Copy ground truth if available
+        if TEST_LABELS and os.path.exists(TEST_LABELS):
+            gt_file = os.path.join(TEST_LABELS, f"{case_id}.nii.gz")
+            if os.path.exists(gt_file):
+                shutil.copy(gt_file, output_gt_path)
+                print(f"    ✅ Copied ground truth: {case_id}_groundtruth.nii.gz")
+            else:
+                print(f"    ⚠️  Ground truth not found: {gt_file}")
         else:
-            print(f"    ⚠️  Ground truth not found")
+            print(f"    ⚠️  No ground truth directory")
 
         # Uncrop and save prediction
-        pred_file = os.path.join(PREDICTIONS_DIR, f"{pdac_id}.nii.gz")
+        pred_file = os.path.join(PREDICTIONS_DIR, f"{case_id}.nii.gz")
         if os.path.exists(pred_file):
             try:
                 # Uncrop prediction to match original image size
-                uncropped_pred = uncrop_prediction(pred_file, original_img_path)
+                uncropped_pred = uncrop_prediction(pred_file, str(img_file))
                 sitk.WriteImage(uncropped_pred, output_pred_path)
 
                 # Verify sizes match
-                orig_img = sitk.ReadImage(original_img_path)
+                orig_img = sitk.ReadImage(str(img_file))
                 pred_img = sitk.ReadImage(output_pred_path)
 
                 orig_size = orig_img.GetSize()
                 pred_size = pred_img.GetSize()
 
                 if orig_size == pred_size:
-                    print(f"    ✅ Saved prediction (uncropped): {pdac_id}_predict.nii.gz")
+                    print(f"    ✅ Saved prediction (uncropped): {case_id}_predict.nii.gz")
                     print(f"       Size verified: {pred_size}")
+
+                    # Check if prediction has any non-zero values
+                    pred_array = sitk.GetArrayFromImage(pred_img)
+                    non_zero = np.sum(pred_array > 0)
+                    print(f"       Predicted tumor voxels: {non_zero}")
                 else:
                     print(f"    ⚠️  Size mismatch! Original: {orig_size}, Prediction: {pred_size}")
 
@@ -283,10 +254,15 @@ def organize_results(case_mapping):
                 print(f"    ❌ Error processing prediction: {e}")
                 import traceback
                 traceback.print_exc()
+                failed_cases.append(case_id)
         else:
             print(f"    ❌ Prediction file not found: {pred_file}")
+            failed_cases.append(case_id)
 
-    return processed_count, len(case_mapping)
+    if failed_cases:
+        print(f"\n⚠️  Failed cases ({len(failed_cases)}): {', '.join(failed_cases)}")
+
+    return processed_count, len(image_files)
 
 def print_summary(processed_count, total_count):
     """Print summary and instructions"""
@@ -339,11 +315,12 @@ def main():
     setup_paths(args)
 
     print("="*80)
-    print("nnU-Net Model Testing & Result Organization")
+    print("nnU-Net Model Testing on Task7_PDAC Data")
     print("="*80)
-    print(f"Dataset: Dataset{DATASET_ID}_PDAC")
+    print(f"Dataset ID: {DATASET_ID}")
     print(f"Checkpoint: {CHECKPOINT_TYPE}")
-    print(f"Input: {TEST_INPUT}")
+    print(f"Input images: {TEST_INPUT}")
+    print(f"Input labels: {TEST_LABELS}")
     print(f"Output: {OUTPUT_DIR}")
     print("")
 
@@ -353,9 +330,6 @@ def main():
         sys.exit(1)
 
     try:
-        # Step 0: Prepare data in nnUNet format
-        case_mapping = prepare_nnunet_format()
-
         # Step 1: Run inference
         if not run_inference():
             print("\n❌ Inference failed. Please check the error messages above.")
@@ -363,23 +337,26 @@ def main():
             return
 
         # Step 2: Organize results and uncrop predictions
-        processed_count, total_count = organize_results(case_mapping)
+        processed_count, total_count = organize_results()
 
         # Step 3: Print summary
         print_summary(processed_count, total_count)
 
         # Step 4: Cleanup temporary files
-        print(f"\n⚠️  Keeping temp directory for debugging: {TEMP_DIR}")
-        # cleanup_temp()  # Disabled for debugging
+        print(f"\n⚠️  Keeping temp directory for inspection: {TEMP_DIR}")
+        print(f"    To clean up manually, run: rm -rf {TEMP_DIR}")
+        # cleanup_temp()  # Disabled - keep files for debugging
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Process interrupted by user (Ctrl+C)")
-        cleanup_temp()
+        print(f"⚠️  Temp directory preserved: {TEMP_DIR}")
+        # cleanup_temp()
     except Exception as e:
         print(f"\n\n❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        cleanup_temp()
+        print(f"\n⚠️  Temp directory preserved for debugging: {TEMP_DIR}")
+        # cleanup_temp()
         sys.exit(1)
 
 if __name__ == "__main__":
