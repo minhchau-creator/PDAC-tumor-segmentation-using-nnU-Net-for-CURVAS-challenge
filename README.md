@@ -6,6 +6,7 @@ slide phân tích:
 
 ## ABSTRACT
 Tôi sử dụng bộ dữ liệu Pancreas của cuộc thi CURVAS (chỉ lấy được tập train vì tập test ko public) để thử nghiệm với nnUNet để segment u tụy.
+Mời xem slide PDAC-CURVAS : [PDAC-CURVAS.pdf](https://github.com/user-attachments/files/27508960/PDAC-CURVAS.pdf) để biết thêm về những gì tôi đã làm
 
 ## Project Structure
 
