@@ -1,6 +1,11 @@
+[PDAC-CURVAS.pdf](https://github.com/user-attachments/files/27508960/PDAC-CURVAS.pdf)
 # CURVAS PDAC Segmentation
 
 Pancreatic Ductal Adenocarcinoma (PDAC) tumor segmentation using nnU-Net for the CURVAS-PDACVI Challenge.
+slide phân tích: 
+
+## ABSTRACT
+Tôi sử dụng bộ dữ liệu Pancreas của cuộc thi CURVAS (chỉ lấy được tập train vì tập test ko public) để thử nghiệm với nnUNet để segment u tụy.
 
 ## Project Structure
 
